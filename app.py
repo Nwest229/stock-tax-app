@@ -18,22 +18,34 @@ years_to_future = st.sidebar.slider("Years into the Future", 0, 20, 5)
 
 # Timeline
 start_year = 2005
-end_year = 2025 + years_to_future
-years = np.arange(start_year, end_year + 1)
+sell_year_hold = 2025
+end_year = sell_year_hold + years_to_future
 
-# Hold scenario
+years_hold = np.arange(start_year, end_year + 1)
+years_rebuy = np.arange(sell_rebuy_year, end_year + 1)
+
+# Hold: split timeline
+hold_years_before_sell = np.arange(start_year, sell_year_hold + 1)
+hold_years_after_sell = np.arange(sell_year_hold + 1, end_year + 1)
+
+# Hold gross value before sell
+hold_value_before = np.linspace(purchase_price, current_value, len(hold_years_before_sell))
+
+# Hold future growth AFTER tax
 hold_gain = current_value - purchase_price
 after_tax_gain = hold_gain * (1 - tax_rate/100)
 hold_net_value_now = purchase_price + after_tax_gain
 
-# Future growth nominal
-future_years = np.arange(2025, end_year + 1)
-future_hold_value = [hold_net_value_now * ((1 + annual_return/100) ** (y - 2025)) for y in future_years]
+hold_value_after = [hold_net_value_now * ((1 + annual_return/100) ** (y - sell_year_hold)) for y in hold_years_after_sell]
 
-# Real value after inflation
-future_hold_value_real = [
-    v / ((1 + annual_inflation/100) ** (y - 2025)) for v, y in zip(future_hold_value, future_years)
+# Real adjustment
+hold_value_after_real = [
+    v / ((1 + annual_inflation/100) ** (y - sell_year_hold)) for v, y in zip(hold_value_after, hold_years_after_sell)
 ]
+
+# Merge
+hold_net = np.concatenate((hold_value_before, hold_value_after))
+hold_net_real = np.concatenate((hold_value_before, hold_value_after_real))
 
 # Combine
 hold_value = np.linspace(purchase_price, current_value, 2025 - start_year + 1)
