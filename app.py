@@ -20,39 +20,60 @@ start_year = 2005
 end_year = 2025 + years_to_future
 years = np.arange(start_year, end_year + 1)
 
-# Scenario 1: Hold
+# Hold scenario
+# -----
+# 1) Original principal grows to current value
+# 2) Tax applies only on gain portion at final sale
+# 3) After-tax amount grows further
+
+# Gain portion
+hold_gain = current_value - purchase_price
+after_tax_gain = hold_gain * (1 - tax_rate/100)
+hold_net_value_now = purchase_price + after_tax_gain
+
+# Future growth: after-tax base grows with new returns (assume no more tax for simplicity)
+future_years = np.arange(2025, end_year + 1)
+future_hold_value = [hold_net_value_now * ((1 + annual_return/100) ** (y - 2025)) for y in future_years]
+
+# Combine
 hold_value = np.linspace(purchase_price, current_value, 2025 - start_year + 1)
-hold_future_years = np.arange(2026, end_year + 1)
-future_hold = [current_value * ((1 + annual_return/100) ** (y - 2025)) for y in hold_future_years]
-hold_value = np.concatenate((hold_value, future_hold))
+hold_net = np.concatenate((hold_value[:-1], [hold_net_value_now], future_hold_value))
 
-# Net value after final tax
-hold_net = hold_value.copy()
-hold_net[years >= 2025] = hold_value[years >= 2025] * (1 - tax_rate/100)
+# Sell & Rebuy scenario
+# -----
+# 1) Sell at sell_rebuy_year -> pay tax on gain since 2005
+# 2) Rebuy with net proceeds
+# 3) New basis grows with annual return
+# 4) Final tax only on NEW gain since rebuy
 
-# Scenario 2: Sell & Rebuy
-sell_idx = sell_rebuy_year - start_year
-rebuy_value = sell_rebuy_value * (1 - tax_rate/100)
+# Gain portion at sell/rebuy
+rebuy_gain = sell_rebuy_value - purchase_price
+rebuy_after_tax = sell_rebuy_value - (rebuy_gain * tax_rate/100)
+
+# Future growth
 rebuy_future_years = np.arange(sell_rebuy_year, end_year + 1)
-rebuy_curve = [rebuy_value * ((1 + annual_return/100) ** (y - sell_rebuy_year)) for y in rebuy_future_years]
+rebuy_gross = [rebuy_after_tax * ((1 + annual_return/100) ** (y - sell_rebuy_year)) for y in rebuy_future_years]
 
-# Final tax when selling rebought shares
-rebuy_net = np.array(rebuy_curve)
-rebuy_net[-1] = rebuy_net[-1] * (1 - tax_rate/100)
+# Final tax on gain AFTER rebuy
+rebuy_final_gain = rebuy_gross[-1] - rebuy_after_tax
+rebuy_after_final_tax = rebuy_gross.copy()
+rebuy_after_final_tax[-1] = rebuy_gross[-1] - (rebuy_final_gain * tax_rate/100)
 
 # Plot
 fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(years, hold_value, label="Hold: Gross Value", linestyle="--")
-ax.plot(years, hold_net, label="Hold: After Tax", linewidth=2)
-ax.plot(rebuy_future_years, rebuy_curve, label="Sell & Rebuy: Gross Value", linestyle="--")
-ax.plot(rebuy_future_years, rebuy_net, label="Sell & Rebuy: After Tax", linewidth=2)
+
+ax.plot(years, hold_value, label="Hold: Gross Value", linestyle="--", color="blue")
+ax.plot(years, hold_net, label="Hold: After Tax & Growth", color="orange", linewidth=2)
+
+ax.plot(rebuy_future_years, rebuy_gross, label="Sell & Rebuy: Gross Value", linestyle="--", color="green")
+ax.plot(rebuy_future_years, rebuy_after_final_tax, label="Sell & Rebuy: After Tax & Growth", color="red", linewidth=2)
 
 ax.axvline(sell_rebuy_year, color="gray", linestyle=":", label="Sell & Rebuy Year")
 ax.axvline(2025, color="black", linestyle=":", label="Sell Year (Hold)")
 
 ax.set_xlabel("Year")
 ax.set_ylabel("Portfolio Value (€)")
-ax.set_title("Hold vs. Sell & Rebuy Comparison")
+ax.set_title("Hold vs. Sell & Rebuy: Smoothed & Corrected")
 ax.legend()
 ax.grid(True)
 
